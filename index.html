@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Placement Sheet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+
+  <div class="max-w-7xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold mb-6 text-center text-blue-700">Student Placement Sheet</h1>
+
+    <div class="flex justify-between mb-4">
+      <div>
+        <input type="text" id="filterDepartment" placeholder="Filter by Department..." 
+          class="border border-gray-300 rounded-md p-2 mr-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <button onclick="filterTable()" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md">Filter</button>
+        <button onclick="clearFilter()" class="ml-2 bg-gray-400 hover:bg-gray-500 text-white py-2 px-4 rounded-md">Clear</button>
+      </div>
+      <div>
+        <button onclick="exportToExcel()" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md mr-2">Download Excel</button>
+        <button onclick="exportToPDF()" class="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md">Download PDF</button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table id="studentTable" class="min-w-full bg-white border border-gray-300">
+        <thead>
+          <tr class="bg-blue-200">
+            <th class="py-2 px-4 border">No</th>
+            <th class="py-2 px-4 border">Name</th>
+            <th class="py-2 px-4 border">Department</th>
+            <th class="py-2 px-4 border">Selected Company</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- Dynamic Rows will appear here -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 text-center">
+      <button onclick="addRow()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg">Add Student</button>
+    </div>
+  </div>
+
+  <script>
+    let studentData = [];
+
+    function addRow() {
+      const tbody = document.getElementById('tableBody');
+      const index = studentData.length + 1;
+      const row = document.createElement('tr');
+
+      row.innerHTML = `
+        <td class="py-2 px-4 border text-center">${index}</td>
+        <td class="py-2 px-4 border">
+          <input type="text" onchange="updateData(${index-1}, 'name', this.value)" 
+            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-400" placeholder="Enter Name">
+        </td>
+        <td class="py-2 px-4 border">
+          <input type="text" onchange="updateData(${index-1}, 'department', this.value)" 
+            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-400" placeholder="Enter Department">
+        </td>
+        <td class="py-2 px-4 border">
+          <input type="text" onchange="updateCompany(${index-1}, this)" 
+            class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-400" placeholder="Enter Company">
+        </td>
+      `;
+      tbody.appendChild(row);
+      studentData.push({ name: "", department: "", company: "" });
+    }
+
+    function updateData(index, field, value) {
+      studentData[index][field] = value.trim();
+      saveData();
+    }
+
+    function updateCompany(index, input) {
+      const value = input.value.trim();
+      if (studentData.some((s, i) => i !== index && s.company.toLowerCase() === value.toLowerCase())) {
+        alert('This company has already been selected by another student!');
+        input.value = "";
+        return;
+      }
+      studentData[index].company = value;
+      saveData();
+    }
+
+    function saveData() {
+      localStorage.setItem('studentData', JSON.stringify(studentData));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem('studentData');
+      if (saved) {
+        studentData = JSON.parse(saved);
+        studentData.forEach((student, idx) => {
+          const tbody = document.getElementById('tableBody');
+          const row = document.createElement('tr');
+
+          row.innerHTML = `
+            <td class="py-2 px-4 border text-center">${idx+1}</td>
+            <td class="py-2 px-4 border">
+              <input type="text" onchange="updateData(${idx}, 'name', this.value)" value="${student.name}"
+                class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-400" placeholder="Enter Name">
+            </td>
+            <td class="py-2 px-4 border">
+              <input type="text" onchange="updateData(${idx}, 'department', this.value)" value="${student.department}"
+                class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-400" placeholder="Enter Department">
+            </td>
+            <td class="py-2 px-4 border">
+              <input type="text" onchange="updateCompany(${idx}, this)" value="${student.company}"
+                class="w-full p-1 border rounded focus:ring-2 focus:ring-blue-400" placeholder="Enter Company">
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+    }
+
+    function filterTable() {
+      const filter = document.getElementById('filterDepartment').value.toLowerCase();
+      const tbody = document.getElementById('tableBody');
+      const rows = tbody.getElementsByTagName('tr');
+
+      for (let row of rows) {
+        const deptInput = row.cells[2].querySelector('input');
+        if (deptInput && !deptInput.value.toLowerCase().includes(filter)) {
+          row.style.display = 'none';
+        } else {
+          row.style.display = '';
+        }
+      }
+    }
+
+    function clearFilter() {
+      document.getElementById('filterDepartment').value = "";
+      filterTable();
+    }
+
+    function exportToExcel() {
+      const wb = XLSX.utils.book_new();
+      const ws_data = [["No", "Name", "Department", "Selected Company"]];
+      studentData.forEach((student, idx) => {
+        ws_data.push([idx+1, student.name, student.department, student.company]);
+      });
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      XLSX.utils.book_append_sheet(wb, ws, "Students");
+      XLSX.writeFile(wb, "students.xlsx");
+    }
+
+    function exportToPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("Student Placement List", 14, 16);
+      let y = 30;
+      studentData.forEach((student, idx) => {
+        doc.text(`${idx+1}. ${student.name} | ${student.department} | ${student.company}`, 14, y);
+        y += 10;
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+      doc.save('students.pdf');
+    }
+
+    window.onload = loadData;
+  </script>
+
+</body>
+</html>
